@@ -1,23 +1,45 @@
 import streamlit as st
-import pickle
-import time
+import joblib
+import re
+from bs4 import BeautifulSoup
+import nltk
 
-st.title('Text Emotion Analysis')
+nltk.download('punkt')
+nltk.download('stopwords')
 
+# Load model and vectorizer
+model = joblib.load('ed.pkl')
+vectorizer = joblib.load('vect.pkl')
 
-# load the model
-model = pickle.load(open('ed.pkl', 'rb'))
+# Preprocessing functions
+def noiseremoval_text(text):
+    soup = BeautifulSoup(text, "html.parser")
+    text = soup.get_text()
+    text = re.sub('\[[^]]*\]', '', text)
+    return text
 
-text = st.text_input('Enter your text here:')
-st.write('You entered:', text)
+def stemmer(text):
+    ps = nltk.porter.PorterStemmer()
+    text = ' '.join([ps.stem(word) for word in text.split()])
+    return text
 
-submit = st.button('Predict')
+def preprocess(text):
+    text = noiseremoval_text(text)
+    text = stemmer(text)
+    return text
 
-if submit:
-    start = time.time()
-    prediction = model.predict([text])
-    end = time.time()
-    st.write('Prediction time taken: ', round(end-start, 2), 'seconds')
-    
-    print(prediction)
-    st.write(prediction)
+# Streamlit UI
+st.set_page_config(page_title="Emotion Classifier", layout="centered")
+st.title("🧠 Emotion Classifier")
+st.write("Enter a sentence, and I'll predict the emotion!")
+
+user_input = st.text_area("Your text here:")
+
+if st.button("Predict"):
+    if user_input.strip() == "":
+        st.warning("Please enter some text.")
+    else:
+        processed = preprocess(user_input)
+        vectorized = vectorizer.transform([processed])
+        prediction = model.predict(vectorized)[0]
+        st.success(f"**Predicted Emotion:** {prediction}")
